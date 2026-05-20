@@ -1,4 +1,4 @@
-import type { SessionUser, UserRole } from '@/types';
+import type { SessionUser, UserRole } from '../types';
 
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET || 'dev-secret-change-in-production';

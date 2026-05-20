@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySessionToken } from '@/lib/auth-edge';
+import { verifySessionToken } from './lib/auth-edge';
 
 const COOKIE_NAME = 'znaniesevera_session';
 
