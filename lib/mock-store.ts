@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import type { Event, EventInput, SessionUser } from '@/types';
 import { DEMO_EVENTS } from '@/lib/mock-data';
 
-const DATA_DIR = join('/tmp', 'znanie-severa');
+const DATA_DIR = join(process.cwd(), 'data');
 const DATA_FILE = join(DATA_DIR, 'mock-db.json');
 
 interface MockUserRow {
