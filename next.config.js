@@ -1,8 +1,11 @@
+// next.config.js
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/**': ['./data/**'],
-    },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'picsum.photos' },
+    ],
+    unoptimized: true,
   },
 };
 
