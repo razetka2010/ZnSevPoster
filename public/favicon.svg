@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b4e83"/>
+      <stop offset="100%" stop-color="#062d55"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#g)"/>
+  <path d="M36 42 L64 86 L92 42" fill="none" stroke="#f5a623" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="44" r="12" fill="#f5a623"/>
+  <text x="64" y="104" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="700" fill="#ffffff">ЗС</text>
+</svg>

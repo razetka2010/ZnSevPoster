@@ -1,0 +1,42 @@
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --brand: #0b4e83;
+  --brand-dark: #062d55;
+  --brand-soft: #eaf3ff;
+  --brand-accent: #f5a623;
+  --brand-muted: #4a5568;
+  --brand-success: #2f855a;
+  --brand-free: #2f855a;
+  --brand-paid: #c05621;
+  --bg: #f7fbff;
+  --text: #1f2937;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.leaflet-container {
+  height: 400px;
+  width: 100%;
+  border-radius: 0.5rem;
+  z-index: 0;
+}

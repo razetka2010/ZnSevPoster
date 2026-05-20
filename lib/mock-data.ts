@@ -1,0 +1,103 @@
+import type { Event } from '@/types';
+
+const now = new Date();
+
+function daysFromNow(days: number, hour = 19): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+export const DEMO_EVENTS: Event[] = [
+  {
+    id: 1,
+    title: 'Джаз на крыше',
+    description: 'Вечер живой джазовой музыки с видом на город.',
+    category: 'concert',
+    date: daysFromNow(1, 20),
+    price: 25,
+    is_free: false,
+    latitude: 50.4501,
+    longitude: 30.5234,
+    venue: 'Sky Lounge, Киев',
+    image_url: 'https://picsum.photos/seed/event1/800/600',
+    images: ['https://picsum.photos/seed/event1/800/600'],
+    created_at: now.toISOString(),
+  },
+  {
+    id: 2,
+    title: 'Выставка современного искусства',
+    description: 'Работы молодых художников Украины и Европы.',
+    category: 'exhibition',
+    date: daysFromNow(3, 11),
+    price: 0,
+    is_free: true,
+    latitude: 50.4547,
+    longitude: 30.5308,
+    venue: 'Галерея «Арсенал»',
+    image_url: 'https://picsum.photos/seed/event2/800/600',
+    images: ['https://picsum.photos/seed/event2/800/600'],
+    created_at: now.toISOString(),
+  },
+  {
+    id: 3,
+    title: 'Гамлет',
+    description: 'Классическая постановка в современной интерпретации.',
+    category: 'theater',
+    date: daysFromNow(5, 18),
+    price: 40,
+    is_free: false,
+    latitude: 50.4478,
+    longitude: 30.5132,
+    venue: 'Национальный академический театр',
+    image_url: 'https://picsum.photos/seed/event3/800/600',
+    images: ['https://picsum.photos/seed/event3/800/600'],
+    created_at: now.toISOString(),
+  },
+  {
+    id: 4,
+    title: 'Лекция: ИИ в повседневной жизни',
+    description: 'Как технологии меняют работу, учёбу и творчество.',
+    category: 'lecture',
+    date: daysFromNow(0, 17),
+    price: 0,
+    is_free: true,
+    latitude: 50.4422,
+    longitude: 30.5367,
+    venue: 'IT-кластер',
+    image_url: 'https://picsum.photos/seed/event4/800/600',
+    images: ['https://picsum.photos/seed/event4/800/600'],
+    created_at: now.toISOString(),
+  },
+  {
+    id: 5,
+    title: 'Городской фестиваль уличной еды',
+    description: 'Кухни мира, музыка и мастер-классы для всей семьи.',
+    category: 'festival',
+    date: daysFromNow(7, 12),
+    price: 15,
+    is_free: false,
+    latitude: 50.4265,
+    longitude: 30.5383,
+    venue: 'Парк Владимирская горка',
+    image_url: 'https://picsum.photos/seed/event5/800/600',
+    images: ['https://picsum.photos/seed/event5/800/600'],
+    created_at: now.toISOString(),
+  },
+  {
+    id: 6,
+    title: 'Симфонический вечер',
+    description: 'Произведения Чайковского и Скрябина в исполнении оркестра.',
+    category: 'concert',
+    date: daysFromNow(14, 19),
+    price: 55,
+    is_free: false,
+    latitude: 50.4601,
+    longitude: 30.5144,
+    venue: 'Киевская опера',
+    image_url: 'https://picsum.photos/seed/event6/800/600',
+    images: ['https://picsum.photos/seed/event6/800/600'],
+    created_at: now.toISOString(),
+  },
+];
