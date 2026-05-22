@@ -50,7 +50,11 @@ export default function EventMap({
     : DEFAULT_CENTER;
 
   return (
-    <MapContainer center={center} zoom={userPosition ? 12 : 11} className="h-[500px] w-full rounded-xl">
+    <MapContainer
+      center={center}
+      zoom={userPosition ? 12 : 11}
+      className="min-h-[420px] h-[min(60vh,700px)] w-full rounded-xl"
+    >
       <TileLayer
         attribution='&copy; OpenStreetMap'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

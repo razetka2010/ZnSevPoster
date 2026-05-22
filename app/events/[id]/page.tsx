@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import EventDetailView from '@/components/EventDetailView';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import type { Event, SessionUser, TicketInfo } from '@/types';
+import type { Event, SessionUser, Ticket, TicketInfo } from '@/types';
 import { eventDistanceKm } from '@/lib/geo';
 
 export default function EventPage() {
@@ -15,6 +15,7 @@ export default function EventPage() {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isGoing, setIsGoing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,7 +40,16 @@ export default function EventPage() {
       const goings: number[] = await goingRes.json();
       setIsGoing(goings.includes(eventId));
     }
+
+    const ticketsRes = await fetch('/api/tickets', { cache: 'no-store' });
+    if (ticketsRes.ok) {
+      const tickets: Ticket[] = await ticketsRes.json();
+      const eventTicket = tickets.find((ticket) => ticket.event_id === eventId) ?? null;
+      setTicket(eventTicket);
+      if (eventTicket) setIsGoing(true);
+    }
   }, [eventId]);
+
 
   useEffect(() => {
     if (!Number.isInteger(eventId) || eventId <= 0) {
@@ -109,7 +119,14 @@ export default function EventPage() {
     }
     if (res.ok) {
       const { added } = await res.json();
-      setIsGoing(added);
+      setIsGoing(ticketInfo ? true : added);
+      if (ticketInfo) {
+        const ticketsRes = await fetch('/api/tickets', { cache: 'no-store' });
+        if (ticketsRes.ok) {
+          const tickets: Ticket[] = await ticketsRes.json();
+          setTicket(tickets.find((ticket) => ticket.event_id === eventId) ?? null);
+        }
+      }
     }
   };
 
@@ -135,6 +152,7 @@ export default function EventPage() {
   return (
     <EventDetailView
       event={event}
+      ticket={ticket}
       isFavorite={isFavorite}
       isGoing={isGoing}
       isLoggedIn={!!user}

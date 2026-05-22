@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Calendar, MapPin, DollarSign, Heart, Users, ArrowLeft, Navigation } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import type { Event, TicketInfo } from '@/types';
+import type { Event, Ticket, TicketInfo } from '@/types';
 import EventGallery from '@/components/EventGallery';
 import { formatDistance } from '@/lib/geo';
 
@@ -25,6 +25,7 @@ const categoryLabels: Record<Event['category'], string> = {
 
 interface EventDetailViewProps {
   event: Event;
+  ticket?: Ticket;
   isFavorite: boolean;
   isGoing: boolean;
   isLoggedIn: boolean;
@@ -34,6 +35,7 @@ interface EventDetailViewProps {
 
 export default function EventDetailView({
   event,
+  ticket,
   isFavorite,
   isGoing,
   isLoggedIn,
@@ -49,6 +51,17 @@ export default function EventDetailView({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const isEditing = isGoing && !!ticket;
+
+  useEffect(() => {
+    if (ticket) {
+      setTicketInfo({
+        name: ticket.name,
+        email: ticket.email,
+        phone: ticket.phone ?? '',
+      });
+    }
+  }, [ticket]);
 
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`;
 
@@ -147,6 +160,16 @@ export default function EventDetailView({
             <p className="whitespace-pre-line leading-relaxed text-gray-700">{event.description}</p>
           </section>
 
+          {ticket && !showForm && (
+            <div className="mb-8 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+              <p className="mb-2 font-semibold text-slate-900">Ваша регистрация</p>
+              <p>Имя: {ticket.name}</p>
+              <p>Email: {ticket.email}</p>
+              {ticket.phone && <p>Телефон: {ticket.phone}</p>}
+              <p className="mt-3 text-slate-500">Чтобы изменить данные, нажмите «Изменить заявку».</p>
+            </div>
+          )}
+
           <section className="mb-8">
             <h2 className="mb-3 text-lg font-semibold text-gray-900">На карте</h2>
             <EventLocationMap
@@ -206,16 +229,28 @@ export default function EventDetailView({
           {showForm && (
             <div className="mt-6 rounded-3xl border border-[var(--brand-soft)] bg-[var(--brand-soft)] p-6">
               <h3 className="mb-4 text-lg font-semibold text-[var(--brand-dark)]">
-                {event.is_free ? 'Форма регистрации' : 'Оформление билета'}
+                {isEditing
+                  ? 'Редактирование заявки'
+                  : event.is_free
+                  ? 'Форма регистрации'
+                  : 'Оформление билета'}
               </h3>
 
               {statusMessage && (
-                <div className="mb-4 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-800">
+                <div
+                  className="mb-4 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-800"
+                  role="status"
+                  aria-live="polite"
+                >
                   {statusMessage}
                 </div>
               )}
               {errorMessage && (
-                <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">
+                <div
+                  className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800"
+                  role="alert"
+                  aria-live="assertive"
+                >
                   {errorMessage}
                 </div>
               )}
@@ -266,7 +301,11 @@ export default function EventDetailView({
                       : 'bg-[var(--brand)] hover:bg-[var(--brand-dark)]'
                   } ${submitting ? 'cursor-not-allowed opacity-80' : ''}`}
                 >
-                  {event.is_free ? 'Зарегистрироваться' : 'Купить билет'}
+                  {isEditing
+                    ? 'Сохранить изменения'
+                    : event.is_free
+                    ? 'Зарегистрироваться'
+                    : 'Купить билет'}
                 </button>
 
                 <p className="text-sm text-[var(--brand-muted)]">

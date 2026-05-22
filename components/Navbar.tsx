@@ -8,9 +8,11 @@ import type { SessionUser } from '@/types';
 import { AUTH_CHANGE_EVENT, fetchCurrentUser, redirectAfterAuth } from '@/lib/auth-client';
 
 function navLinkClass(active: boolean) {
-  return active
-    ? 'font-medium text-blue-600'
-    : 'text-gray-700 transition hover:text-blue-600';
+  return `rounded-full px-4 py-2 text-sm font-medium transition ${
+    active
+      ? 'bg-slate-100 text-blue-600 shadow-sm'
+      : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
+  }`;
 }
 
 function NavbarLinks() {
@@ -19,7 +21,7 @@ function NavbarLinks() {
   const isMapView = searchParams.get('view') === 'map';
 
   return (
-    <div className="hidden items-center space-x-6 md:flex">
+    <div className="hidden items-center gap-2 md:flex">
       <Link href="/" className={navLinkClass(pathname === '/' && !isMapView)}>
         Лента
       </Link>
@@ -93,16 +95,16 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-white shadow-md">
+      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <Link href="/" className="flex shrink-0 items-center gap-3" title="Знание Севера Афиша">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--brand)] text-white shadow-lg shadow-[rgba(11,78,131,0.18)]">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--brand)] text-white shadow-lg shadow-[rgba(11,78,131,0.18)]">
                 <Calendar className="h-6 w-6" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-[var(--brand-dark)]">ЗС Афиша</span>
-                <span className="text-xs text-slate-500">znaniesevera.vercel.app</span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-base font-semibold text-[var(--brand-dark)]">ЗС Афиша</span>
+                <span className="text-[11px] uppercase tracking-[0.24em] text-slate-500">afisha</span>
               </div>
             </Link>
 
@@ -120,17 +122,10 @@ export default function Navbar() {
                   Админ
                 </Link>
               )}
-              {user && (
-                <Link
-                  href="/tickets"
-                  className="hidden rounded-lg border border-[var(--brand)] px-3 py-2 text-sm font-medium text-[var(--brand)] hover:bg-[var(--brand-soft)] sm:flex"
-                >
-                  Мои билеты
-                </Link>
-              )}
 
               <Link
                 href="/favorites"
+                aria-label="Избранное"
                 className={`rounded-full p-2 md:hidden ${
                   pathname === '/favorites' ? 'text-red-500' : 'text-gray-600'
                 }`}

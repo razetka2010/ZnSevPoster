@@ -18,8 +18,17 @@ export function useGeolocation() {
       return;
     }
 
+    if (!window.isSecureContext) {
+      setError('Геопозиция работает только по HTTPS или на localhost. Откройте сайт через защищённое соединение.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
+    const PERMISSION_DENIED = 1;
+    const POSITION_UNAVAILABLE = 2;
+    const TIMEOUT = 3;
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -28,13 +37,17 @@ export function useGeolocation() {
       },
       (err) => {
         setLoading(false);
-        if (err.code === err.PERMISSION_DENIED) {
+        if (err.code === PERMISSION_DENIED) {
           setError('Разрешите доступ к местоположению в настройках браузера');
+        } else if (err.code === TIMEOUT) {
+          setError('Не удалось определить местоположение. Попробуйте ещё раз.');
+        } else if (err.code === POSITION_UNAVAILABLE) {
+          setError('Местоположение временно недоступно. Проверьте интернет и попробуйте снова.');
         } else {
           setError('Не удалось определить местоположение');
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 0 }
     );
   }, []);
 

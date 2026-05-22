@@ -8,6 +8,7 @@ import EventFeed from '@/components/EventFeed';
 import Filters from '@/components/Filters';
 import LocationPrompt from '@/components/LocationPrompt';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import type { GeoPosition } from '@/hooks/useGeolocation';
 import type { Event, EventFilters, SessionUser, TicketInfo } from '@/types';
 
 const EventMap = dynamic(() => import('@/components/EventMap'), {
@@ -21,7 +22,7 @@ const EventMap = dynamic(() => import('@/components/EventMap'), {
 
 function LoadingSpinner({ message }: { message: string }) {
   return (
-    <div className="py-12 text-center">
+    <div className="py-12 text-center" role="status" aria-live="polite">
       <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
       <p className="mt-2 text-gray-600">{message}</p>
     </div>
@@ -43,6 +44,35 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view');
   const { position, error: geoError, loading: geoLoading, requestLocation } = useGeolocation();
+  const [manualPosition, setManualPosition] = useState<GeoPosition | null>(null);
+  const positionToUse = manualPosition ?? position;
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('manualLocation');
+      if (stored) {
+        const parsed = JSON.parse(stored) as GeoPosition;
+        if (
+          parsed?.lat != null &&
+          parsed?.lng != null &&
+          Number.isFinite(parsed.lat) &&
+          Number.isFinite(parsed.lng)
+        ) {
+          setManualPosition(parsed);
+        }
+      }
+    } catch {
+      // ignore invalid storage values
+    }
+  }, []);
+
+  useEffect(() => {
+    if (manualPosition) {
+      window.localStorage.setItem('manualLocation', JSON.stringify(manualPosition));
+    } else {
+      window.localStorage.removeItem('manualLocation');
+    }
+  }, [manualPosition]);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [favorites, setFavorites] = useState<number[]>([]);
@@ -82,15 +112,15 @@ function HomeContent() {
   }, []);
 
   useEffect(() => {
-    if (position) {
+    if (positionToUse) {
       setFilters((prev) => ({
         ...prev,
-        lat: position.lat,
-        lng: position.lng,
+        lat: positionToUse.lat,
+        lng: positionToUse.lng,
         radius_km: prev.radius_km ?? 15,
       }));
     }
-  }, [position]);
+  }, [positionToUse]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -110,14 +140,17 @@ function HomeContent() {
     );
   }, [events, searchQuery]);
 
-  const handleFilterChange = useCallback((next: EventFilters) => {
-    setFilters((prev) => ({
-      ...next,
-      ...(position
-        ? { lat: position.lat, lng: position.lng, radius_km: next.radius_km ?? prev.radius_km ?? 15 }
-        : {}),
-    }));
-  }, [position]);
+  const handleFilterChange = useCallback(
+    (next: EventFilters) => {
+      setFilters((prev) => ({
+        ...next,
+        ...(positionToUse
+          ? { lat: positionToUse.lat, lng: positionToUse.lng, radius_km: next.radius_km ?? prev.radius_km ?? 15 }
+          : {}),
+      }));
+    },
+    [positionToUse]
+  );
 
   const toggleFavorite = async (eventId: number) => {
     const res = await fetch('/api/favorites', {
@@ -146,13 +179,16 @@ function HomeContent() {
       return;
     }
     if (res.ok) {
-      const goingRes = await fetch('/api/going');
-      if (goingRes.ok) setGoing(await goingRes.json());
+      const data = await res.json();
+      setGoing((prev) => {
+        if (data?.added) return [...prev, eventId];
+        return ticketInfo ? prev : prev.filter((id) => id !== eventId);
+      });
     }
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 rounded-[2rem] border border-[var(--brand-soft)] bg-[var(--brand-soft)] p-5 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -191,17 +227,19 @@ function HomeContent() {
         error={geoError}
         loading={geoLoading}
         onRetry={requestLocation}
+        onManualPick={(lat, lng) => setManualPosition({ lat, lng })}
+        onClearManual={() => setManualPosition(null)}
       />
 
       <Filters
         onFilterChange={handleFilterChange}
-        hasLocation={!!position}
-        locationLat={position?.lat}
-        locationLng={position?.lng}
+        hasLocation={!!positionToUse}
+        locationLat={positionToUse?.lat}
+        locationLng={positionToUse?.lng}
       />
 
       {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-700" role="alert">
+        <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-700" role="alert" aria-live="assertive">
           {error}
         </p>
       )}
@@ -209,13 +247,37 @@ function HomeContent() {
       {loading ? (
         <LoadingSpinner message="Загрузка событий..." />
       ) : view === 'map' ? (
-        <EventMap
-          events={filteredEvents}
-          favorites={favorites}
-          userPosition={position}
-          radiusKm={filters.radius_km ?? 15}
-          onToggleFavorite={toggleFavorite}
-        />
+        <div className="space-y-6">
+          <EventMap
+            events={filteredEvents}
+            favorites={favorites}
+            userPosition={positionToUse}
+            radiusKm={filters.radius_km ?? 15}
+            onToggleFavorite={toggleFavorite}
+          />
+          {!positionToUse && (
+            <div className="mt-4 rounded-3xl bg-slate-50 p-4 text-sm text-gray-700">
+              Разрешите геолокацию или выберите местоположение вручную, чтобы увидеть события рядом с вами.
+            </div>
+          )}
+          {filteredEvents.length === 0 ? (
+            <p className="py-12 text-center text-gray-600">
+              {positionToUse
+                ? 'События не найдены в выбранном радиусе. Увеличьте радиус или измените фильтры.'
+                : 'Разрешите геолокацию или нажмите «Применить фильтры».'}
+            </p>
+          ) : (
+            <EventFeed
+              events={filteredEvents}
+              favorites={favorites}
+              going={going}
+              isLoggedIn={!!user}
+              userPosition={position}
+              onToggleFavorite={toggleFavorite}
+              onToggleGoing={toggleGoing}
+            />
+          )}
+        </div>
       ) : filteredEvents.length === 0 ? (
         <p className="py-12 text-center text-gray-600">
           {position

@@ -61,7 +61,7 @@ export default function EventFeed({
           <Link href={`/events/${event.id}`} className="relative block h-48 overflow-hidden">
             <img
               src={event.images?.[0] || event.image_url}
-              alt={event.title}
+              alt={`${event.title} — превью события`}
               className="h-full w-full object-cover"
               loading="lazy"
             />
@@ -87,6 +87,11 @@ export default function EventFeed({
                   type="button"
                   onClick={() => onToggleFavorite(event.id)}
                   className="shrink-0 rounded-full p-1.5 hover:bg-gray-100"
+                  aria-label={
+                    favorites.includes(event.id)
+                      ? 'Убрать из избранного'
+                      : 'Добавить в избранное'
+                  }
                 >
                   <Heart
                     className={`h-5 w-5 ${
@@ -121,19 +126,6 @@ export default function EventFeed({
             </div>
 
             <div className="mt-auto flex flex-col gap-3">
-              {isLoggedIn && (
-                <button
-                  type="button"
-                  onClick={() => onToggleGoing(event.id)}
-                  className={`w-full rounded-3xl px-4 py-3 text-sm font-semibold transition ${
-                    going.includes(event.id)
-                      ? 'bg-green-600 text-white shadow-lg shadow-green-200/50'
-                      : 'bg-[var(--brand)] text-white shadow-lg shadow-blue-200/50 hover:bg-blue-700'
-                  }`}
-                >
-                  {going.includes(event.id) ? 'Я иду' : 'Пойду'}
-                </button>
-              )}
               <Link
                 href={`/events/${event.id}`}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"

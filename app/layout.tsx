@@ -48,7 +48,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className="font-sans antialiased">
         <Navbar />
-        <main className="min-h-screen bg-gray-50">{children}</main>
+        <main className="min-h-screen bg-gray-50 pb-24 md:pb-0">{children}</main>
       </body>
     </html>
   );
