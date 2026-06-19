@@ -1,11 +1,14 @@
 import type { Event } from '@/types';
 import { normalizeCoordinates } from '@/lib/geo';
+import { normalizeUploadUrl } from '@/lib/images';
 
 type EventRow = Record<string, unknown>;
 
 export function parseImages(value: unknown, fallbackUrl?: string): string[] {
   if (Array.isArray(value)) {
-    const urls = value.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
+    const urls = value
+      .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+      .map(normalizeUploadUrl);
     if (urls.length > 0) return urls;
   }
   if (typeof value === 'string') {
@@ -16,12 +19,12 @@ export function parseImages(value: unknown, fallbackUrl?: string): string[] {
       /* ignore */
     }
   }
-  if (fallbackUrl) return [fallbackUrl];
+  if (fallbackUrl) return [normalizeUploadUrl(fallbackUrl)];
   return [];
 }
 
 export function mapEventRow(row: EventRow): Event {
-  const image_url = String(row.image_url ?? '');
+  const image_url = normalizeUploadUrl(String(row.image_url ?? ''));
   const images = parseImages(row.images, image_url);
   const cover = images[0] || image_url;
   const coords = normalizeCoordinates(Number(row.latitude), Number(row.longitude));
@@ -41,5 +44,6 @@ export function mapEventRow(row: EventRow): Event {
     image_url: cover,
     images: images.length > 0 ? images : cover ? [cover] : [],
     created_at: new Date(row.created_at as string | Date).toISOString(),
+    is_completed: Boolean(row.is_completed),
   };
 }

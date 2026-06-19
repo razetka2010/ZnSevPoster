@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     const ticketInfo = body?.ticketInfo;
     const event = await getEventById(eventId);
     if (!event) return jsonError('Событие не найдено', 404);
+    if (event.is_completed) {
+      return jsonError('Регистрация на завершённое мероприятие невозможна', 400);
+    }
 
     if (ticketInfo && typeof ticketInfo === 'object') {
       console.info('Registration info:', {

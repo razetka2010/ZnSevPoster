@@ -12,6 +12,7 @@ interface MockUserRow {
   email: string;
   password_hash: string;
   name: string;
+  phone?: string | null;
   role: 'user' | 'admin';
   created_at: string;
 }
@@ -24,6 +25,7 @@ interface MockTicketRow {
   email: string;
   phone?: string | null;
   is_paid: boolean;
+  checked_in: boolean;
   created_at: string;
 }
 
@@ -94,13 +96,19 @@ function loadMockDbFromFile(): MockState | null {
     const raw = readFileSync(DATA_FILE, 'utf8');
     const data = JSON.parse(raw) as MockDbFile;
     return {
-      events: data.events ?? [],
+      events: (data.events ?? []).map((event) => ({
+        ...event,
+        is_completed: event.is_completed ?? false,
+      })),
       nextEventId: data.nextEventId ?? 1,
       favorites: recordToMap(data.favorites ?? {}),
       going: recordToMap(data.going ?? {}),
       users: data.users ?? [],
       nextUserId: data.nextUserId ?? 1,
-      tickets: data.tickets ?? [],
+      tickets: (data.tickets ?? []).map((ticket) => ({
+        ...ticket,
+        checked_in: ticket.checked_in ?? false,
+      })),
       nextTicketId: data.nextTicketId ?? 1,
     };
   } catch (error) {
@@ -111,7 +119,10 @@ function loadMockDbFromFile(): MockState | null {
 
 function createDefaultState(): MockState {
   return {
-    events: [...DEMO_EVENTS],
+    events: DEMO_EVENTS.map((event) => ({
+      ...event,
+      is_completed: event.is_completed ?? false,
+    })),
     nextEventId: DEMO_EVENTS.length + 1,
     favorites: new Map(),
     going: new Map(),
@@ -160,6 +171,52 @@ async function ensureAdmin() {
 export async function mockFindUserByEmail(email: string) {
   await ensureAdmin();
   return getState().users.find((u) => u.email === email.toLowerCase().trim()) ?? null;
+}
+
+export async function mockGetUserById(userId: number): Promise<SessionUser | null> {
+  await ensureAdmin();
+  const user = getState().users.find((u) => u.id === userId) ?? null;
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone ?? undefined,
+    role: user.role,
+  };
+}
+
+export async function mockUpdateUserProfile(
+  userId: number,
+  email: string,
+  name: string,
+  phone?: string | null
+): Promise<SessionUser> {
+  await ensureAdmin();
+  const state = getState();
+  const normalized = email.toLowerCase().trim();
+  const existing = state.users.find((u) => u.email === normalized && u.id !== userId);
+  if (existing) {
+    throw new Error('EMAIL_EXISTS');
+  }
+
+  const user = state.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  user.email = normalized;
+  user.name = name.trim();
+  user.phone = phone ?? null;
+  persist();
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone ?? undefined,
+    role: user.role,
+  };
 }
 
 export async function mockCreateUser(
@@ -250,6 +307,35 @@ export function mockGetEventTickets(eventId: number) {
     .map((ticket) => ({ ...ticket }));
 }
 
+export function mockGetTicketById(ticketId: number) {
+  const state = getState();
+  return state.tickets.find((ticket) => ticket.id === ticketId) ?? null;
+}
+
+export function mockCheckInTicket(ticketId: number) {
+  const state = getState();
+  const ticket = state.tickets.find((ticket) => ticket.id === ticketId);
+  if (!ticket) return null;
+  ticket.checked_in = true;
+  persist();
+  return { ...ticket };
+}
+
+export function mockCompleteEvent(id: number): Event | null {
+  const state = getState();
+  const event = state.events.find((event) => event.id === id);
+  if (!event) return null;
+  event.is_completed = true;
+  state.tickets = state.tickets.filter((ticket) => ticket.event_id !== id);
+  for (const map of [state.favorites, state.going]) {
+    for (const set of Array.from(map.values())) {
+      set.delete(id);
+    }
+  }
+  persist();
+  return { ...event };
+}
+
 export function mockCreateOrUpdateTicket(
   userId: number,
   eventId: number,
@@ -276,6 +362,7 @@ export function mockCreateOrUpdateTicket(
     email: ticketInfo.email,
     phone: ticketInfo.phone ?? null,
     is_paid: isPaid,
+    checked_in: false,
     created_at: new Date().toISOString(),
   };
   state.tickets.push(ticket);
@@ -297,6 +384,7 @@ export function mockCreateEvent(input: EventInput, _createdBy: number): Event {
     id: state.nextEventId++,
     ...input,
     address: input.address ?? null,
+    is_completed: false,
     created_at: new Date().toISOString(),
   };
   state.events.push(event);

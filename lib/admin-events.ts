@@ -58,8 +58,8 @@ export function parseEventInput(body: Record<string, unknown>): ParseEventResult
   }
 
   const coords = normalizeCoordinates(lat, lng);
-  const is_free = Boolean(body.is_free);
-  const price = is_free ? 0 : Number(body.price) || 0;
+  const is_free = true;
+  const price = 0;
 
   return {
     ok: true,

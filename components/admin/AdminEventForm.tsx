@@ -3,10 +3,12 @@
 import { FormEvent, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import type { Event, EventCategory } from '@/types';
 
 const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
+
+import SafeImage from '../SafeImage';
 
 const categories: { value: EventCategory; label: string }[] = [
   { value: 'concert', label: 'Концерт' },
@@ -26,6 +28,9 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [fileUploadStatus, setFileUploadStatus] = useState<{
+    [fileName: string]: { progress: number; status: 'uploading' | 'success' | 'error'; error?: string }
+  }>({});
 
   const [title, setTitle] = useState(initial?.title ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -35,38 +40,132 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
   const [date, setDate] = useState(
     initial?.date ? new Date(initial.date).toISOString().slice(0, 16) : ''
   );
-  const [isFree, setIsFree] = useState(initial?.is_free ?? false);
-  const [price, setPrice] = useState(String(initial?.price ?? 0));
   const [images, setImages] = useState<string[]>(
     initial?.images?.length ? initial.images : initial?.image_url ? [initial.image_url] : []
   );
   const [latitude, setLatitude] = useState<number | null>(initial?.latitude ?? null);
   const [longitude, setLongitude] = useState<number | null>(initial?.longitude ?? null);
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
-    return data.url as string;
+  const uploadFile = async (
+    file: File,
+    retries = 3,
+    onProgress?: (progress: number) => void
+  ): Promise<string> => {
+    if (!file.type.startsWith('image/')) {
+      throw new Error(`${file.name}: допустимы только изображения`);
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error(`${file.name}: максимальный размер 5 МБ`);
+    }
+
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const url = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const formData = new FormData();
+          formData.append('file', file);
+
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && onProgress) {
+              const progress = Math.round((e.loaded / e.total) * 100);
+              onProgress(progress);
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.url) {
+                  resolve(data.url);
+                } else {
+                  reject(new Error('Сервер не вернул URL файла'));
+                }
+              } catch {
+                reject(new Error('Некорректный ответ сервера'));
+              }
+            } else {
+              let errorMsg = `Ошибка загрузки (статус ${xhr.status})`;
+              try {
+                const data = JSON.parse(xhr.responseText);
+                errorMsg = data.error || errorMsg;
+              } catch {}
+              reject(new Error(errorMsg));
+            }
+          });
+
+          xhr.addEventListener('error', () => reject(new Error('Ошибка сети при загрузке')));
+          xhr.addEventListener('abort', () => reject(new Error('Загрузка отменена')));
+
+          xhr.open('POST', '/api/upload');
+          xhr.send(formData);
+        });
+
+        return url;
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e));
+        if (attempt < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
+    }
+    throw lastError || new Error('Не удалось загрузить файл после нескольких попыток');
   };
 
   const handleImagesUpload = async (files: FileList | null) => {
     if (!files?.length) return;
+
+    const fileArray = Array.from(files);
+    const maxFiles = 10;
+    if (fileArray.length > maxFiles) {
+      setError(`Максимум ${maxFiles} файлов одновременно`);
+      return;
+    }
+
     setUploading(true);
     setError(null);
-    try {
-      const uploaded: string[] = [];
-      for (const file of Array.from(files)) {
-        uploaded.push(await uploadFile(file));
+    const uploaded: string[] = [];
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      setFileUploadStatus((prev) => ({
+        ...prev,
+        [file.name]: { progress: 0, status: 'uploading' },
+      }));
+
+      try {
+        const url = await uploadFile(
+          file,
+          3,
+          (progress) => {
+            setFileUploadStatus((prev) => ({
+              ...prev,
+              [file.name]: { ...prev[file.name], progress },
+            }));
+          }
+        );
+        uploaded.push(url);
+        setFileUploadStatus((prev) => ({
+          ...prev,
+          [file.name]: { progress: 100, status: 'success' },
+        }));
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : 'Неизвестная ошибка';
+        setFileUploadStatus((prev) => ({
+          ...prev,
+          [file.name]: { progress: 0, status: 'error', error: errorMsg },
+        }));
+        setError(`Ошибка при загрузке ${file.name}: ${errorMsg}`);
       }
-      setImages((prev) => [...prev, ...uploaded]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить изображения');
-    } finally {
-      setUploading(false);
     }
+
+    if (uploaded.length > 0) {
+      setImages((prev) => [...prev, ...uploaded]);
+    }
+
+    setUploading(false);
   };
 
   const removeImage = (index: number) => {
@@ -105,8 +204,8 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
       venue,
       address,
       date,
-      is_free: isFree,
-      price: isFree ? 0 : Number(price),
+      is_free: true,
+      price: 0,
       image_url: images[0],
       images,
       latitude,
@@ -120,13 +219,28 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30000),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const errorMsg = data.error || `Ошибка сервера (${res.status})`;
+        throw new Error(errorMsg);
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ошибка сохранения');
+      if (!data.id) {
+        throw new Error('Сервер не вернул ID мероприятия');
+      }
+
       router.push('/admin');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Превышено время ожидания. Проверьте интернет и попробуйте снова');
+      } else {
+        setError(err instanceof Error ? err.message : 'Ошибка при сохранении мероприятия');
+      }
     } finally {
       setSaving(false);
     }
@@ -197,7 +311,7 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">Дата и время</label>
           <input
@@ -208,24 +322,9 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
             className="w-full rounded-lg border px-3 py-2"
           />
         </div>
-        <div className="flex items-end gap-2">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />
-            Бесплатно
-          </label>
+        <div className="flex items-end text-green-600">
+          <span className="text-sm font-medium">Мероприятие бесплатное</span>
         </div>
-        {!isFree && (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Цена ($)</label>
-            <input
-              type="number"
-              min="0"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2"
-            />
-          </div>
-        )}
       </div>
 
       <div>
@@ -241,13 +340,44 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
           }}
           className="mb-2 block w-full text-sm"
         />
-        {uploading && <p className="text-sm text-gray-500">Загрузка...</p>}
+
+        {Object.entries(fileUploadStatus).length > 0 && (
+          <div className="mb-3 space-y-2">
+            {Object.entries(fileUploadStatus).map(([fileName, status]) => (
+              <div key={fileName} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="truncate text-sm font-medium text-gray-700">{fileName}</span>
+                  {status.status === 'uploading' && (
+                    <span className="text-sm text-blue-600">{status.progress}%</span>
+                  )}
+                  {status.status === 'success' && (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  )}
+                  {status.status === 'error' && (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  )}
+                </div>
+                {status.status === 'uploading' && (
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className="h-full bg-blue-600 transition-all duration-300"
+                      style={{ width: `${status.progress}%` }}
+                    />
+                  </div>
+                )}
+                {status.status === 'error' && status.error && (
+                  <p className="mt-1 text-sm text-red-600">{status.error}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {images.length > 0 && (
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {images.map((url, index) => (
               <div key={`${url}-${index}`} className="relative">
-                <img src={url} alt={`Фото ${index + 1}`} className="h-28 w-full rounded-lg object-cover" />
+                <SafeImage src={url} alt={`Фото ${index + 1}`} className="h-28 w-full rounded-lg object-cover" />
                 {index === 0 && (
                   <span className="absolute left-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-xs text-white">
                     Обложка
@@ -285,10 +415,10 @@ export default function AdminEventForm({ initial, submitLabel }: AdminEventFormP
 
       <button
         type="submit"
-        disabled={saving}
+        disabled={saving || uploading}
         className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
-        {saving ? 'Сохранение...' : submitLabel}
+        {saving ? 'Сохранение...' : uploading ? 'Загрузка файлов...' : submitLabel}
       </button>
     </form>
   );

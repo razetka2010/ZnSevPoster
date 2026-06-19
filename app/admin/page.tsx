@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, Ticket, Trash2 } from 'lucide-react';
+import { CheckCircle, Plus, Pencil, Ticket, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { Event } from '@/types';
@@ -49,6 +49,18 @@ export default function AdminPage() {
     setActionError(data.error || 'Не удалось удалить');
   };
 
+  const handleComplete = async (id: number) => {
+    if (!confirm('Отметить мероприятие как завершённое? Это удалит все связанные билеты.')) return;
+    setActionError(null);
+    const res = await fetch(`/api/admin/events/${id}/complete`, { method: 'POST' });
+    if (res.ok) {
+      await load();
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setActionError(data.error || 'Не удалось завершить мероприятие');
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -56,13 +68,22 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold text-gray-900">Админ-панель</h1>
           <p className="text-gray-600">Управление мероприятиями</p>
         </div>
-        <Link
-          href="/admin/events/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white hover:bg-blue-700"
-        >
-          <Plus className="h-5 w-5" />
-          Создать мероприятие
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/tickets/scan"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-slate-700 transition hover:bg-slate-50"
+          >
+            <Ticket className="h-5 w-5" />
+            Проверить билет
+          </Link>
+          <Link
+            href="/admin/events/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white hover:bg-blue-700"
+          >
+            <Plus className="h-5 w-5" />
+            Создать мероприятие
+          </Link>
+        </div>
       </div>
 
       {mockMode && (
@@ -91,6 +112,7 @@ export default function AdminPage() {
                 <th className="px-4 py-3">Название</th>
                 <th className="px-4 py-3">Дата</th>
                 <th className="px-4 py-3">Место</th>
+                <th className="px-4 py-3">Статус</th>
                 <th className="px-4 py-3 text-right">Действия</th>
               </tr>
             </thead>
@@ -102,6 +124,9 @@ export default function AdminPage() {
                     {format(new Date(event.date), 'd MMM yyyy', { locale: ru })}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{event.venue}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">
+                    {event.is_completed ? 'Завершено' : 'Активно'}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <Link
@@ -116,6 +141,14 @@ export default function AdminPage() {
                       >
                         <Ticket className="h-4 w-4" />
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleComplete(event.id)}
+                        className="rounded-lg p-2 text-amber-600 hover:bg-amber-50"
+                        title="Завершить мероприятие"
+                      >
+                        ✓
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(event.id)}

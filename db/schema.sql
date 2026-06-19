@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS events (
   image_url TEXT NOT NULL,
   images JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  is_completed BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
   is_paid BOOLEAN NOT NULL DEFAULT false,
+  checked_in BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (user_id, event_id)
 );

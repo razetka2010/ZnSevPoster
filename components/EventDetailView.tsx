@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { Calendar, MapPin, DollarSign, Heart, Users, ArrowLeft, Navigation } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import type { Event, Ticket, TicketInfo } from '@/types';
+import type { Event, Ticket, TicketInfo, SessionUser } from '@/types';
 import EventGallery from '@/components/EventGallery';
+import TicketQRCode from '@/components/TicketQRCode';
 import { formatDistance } from '@/lib/geo';
 
 const EventLocationMap = dynamic(() => import('@/components/EventLocationMap'), {
@@ -26,6 +27,7 @@ const categoryLabels: Record<Event['category'], string> = {
 interface EventDetailViewProps {
   event: Event;
   ticket?: Ticket;
+  user?: SessionUser | null;
   isFavorite: boolean;
   isGoing: boolean;
   isLoggedIn: boolean;
@@ -36,6 +38,7 @@ interface EventDetailViewProps {
 export default function EventDetailView({
   event,
   ticket,
+  user,
   isFavorite,
   isGoing,
   isLoggedIn,
@@ -53,6 +56,8 @@ export default function EventDetailView({
   const [submitting, setSubmitting] = useState(false);
   const isEditing = isGoing && !!ticket;
 
+  const hasProfileInfo = Boolean(user?.name?.trim() && user?.email?.trim());
+
   useEffect(() => {
     if (ticket) {
       setTicketInfo({
@@ -60,8 +65,39 @@ export default function EventDetailView({
         email: ticket.email,
         phone: ticket.phone ?? '',
       });
+    } else if (user) {
+      setTicketInfo({
+        name: user.name,
+        email: user.email,
+        phone: user.phone ?? '',
+      });
     }
-  }, [ticket]);
+  }, [ticket, user]);
+
+  const handleQuickGoing = async () => {
+    if (!user || !hasProfileInfo) {
+      setShowForm(true);
+      return;
+    }
+
+    setErrorMessage(null);
+    setStatusMessage(null);
+    setSubmitting(true);
+
+    try {
+      await onToggleGoing(event.id, {
+        name: user.name,
+        email: user.email,
+        phone: user.phone ?? '',
+      });
+      setStatusMessage('Вы успешно зарегистрированы на событие.');
+      setShowForm(false);
+    } catch {
+      setErrorMessage('Не удалось зарегистрироваться. Попробуйте позже.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`;
 
@@ -166,7 +202,19 @@ export default function EventDetailView({
               <p>Имя: {ticket.name}</p>
               <p>Email: {ticket.email}</p>
               {ticket.phone && <p>Телефон: {ticket.phone}</p>}
+              <p className="mt-2 text-sm text-slate-900">
+                Статус входа:{' '}
+                <span className={ticket.checked_in ? 'text-emerald-700' : 'text-slate-600'}>
+                  {ticket.checked_in ? 'Вход подтверждён' : 'Ожидает подтверждения'}
+                </span>
+              </p>
               <p className="mt-3 text-slate-500">Чтобы изменить данные, нажмите «Изменить заявку».</p>
+            </div>
+          )}
+
+          {ticket && (
+            <div className="mb-8">
+              <TicketQRCode ticketId={ticket.id} eventTitle={event.title} />
             </div>
           )}
 
@@ -196,6 +244,10 @@ export default function EventDetailView({
                 </Link>
                 , чтобы добавить в избранное или заполнить форму «Пойду»
               </p>
+            ) : event.is_completed ? (
+              <div className="rounded-3xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Это мероприятие завершено. Регистрация закрыта.
+              </div>
             ) : (
               <>
                 <button
@@ -212,7 +264,7 @@ export default function EventDetailView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm((prev) => !prev)}
+                  onClick={isGoing ? () => setShowForm(true) : handleQuickGoing}
                   className={`flex items-center gap-2 rounded-lg px-6 py-3 transition ${
                     isGoing
                       ? 'bg-green-600 text-white hover:bg-green-700'
@@ -220,7 +272,7 @@ export default function EventDetailView({
                   }`}
                 >
                   <Users className="h-5 w-5" />
-                  {isGoing ? 'Изменить заявку' : 'Пойду'}
+                  {isGoing ? 'Изменить заявку' : hasProfileInfo ? 'Пойду' : 'Заполнить форму'}
                 </button>
               </>
             )}

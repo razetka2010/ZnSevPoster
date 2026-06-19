@@ -40,13 +40,17 @@ async function main() {
   });
 
   try {
-    const migratePath = join(root, 'db', 'migrate-images.sql');
-    if (!existsSync(migratePath)) {
-      console.error('migrate-images.sql not found');
-      process.exit(1);
+    const migrationFiles = ['migrate-images.sql', 'migrate-add-is-completed.sql'];
+    for (const fileName of migrationFiles) {
+      const migratePath = join(root, 'db', fileName);
+      if (!existsSync(migratePath)) {
+        console.warn(`${fileName} not found, skipping`);
+        continue;
+      }
+      console.log(`Applying migration: ${fileName}`);
+      await pool.query(readFileSync(migratePath, 'utf8'));
     }
-    await pool.query(readFileSync(migratePath, 'utf8'));
-    console.log('✅ Migration completed (images column)');
+    console.log('✅ Migrations completed');
   } catch (err) {
     console.error('Migration failed:', err.message);
     process.exit(1);

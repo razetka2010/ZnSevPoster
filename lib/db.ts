@@ -6,14 +6,17 @@ import { mapEventRow } from '@/lib/event-mapper';
 import {
   mockCreateEvent,
   mockCreateOrUpdateTicket,
+  mockCompleteEvent,
   mockDeleteEvent,
   mockGetEventById,
   mockGetEventTickets,
   mockGetEvents,
+  mockGetTicketById,
   mockGetUserEvents,
   mockGetUserTickets,
   mockToggleUserEvent,
   mockUpdateEvent,
+  mockCheckInTicket,
 } from '@/lib/mock-store';
 
 const globalForPg = globalThis as typeof globalThis & {
@@ -155,6 +158,10 @@ export async function getEvents(filters?: EventFilters): Promise<Event[]> {
     sql += ' AND is_free = false';
   }
 
+  if (filters?.includeCompleted !== true) {
+    sql += ' AND is_completed = false';
+  }
+
   const dateFilter = filters?.date;
   if (dateFilter && dateFilter !== 'all') {
     const now = new Date();
@@ -276,6 +283,31 @@ export async function updateEvent(id: number, input: EventInput): Promise<Event 
   return result.rows[0] ? mapEventRow(result.rows[0]) : null;
 }
 
+export async function completeEvent(id: number): Promise<Event | null> {
+  if (!(await canUseDatabase())) {
+    return mockCompleteEvent(id);
+  }
+
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query('UPDATE events SET is_completed = true WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await client.query('DELETE FROM tickets WHERE event_id = $1', [id]);
+    await client.query('DELETE FROM user_events WHERE event_id = $1', [id]);
+    await client.query('COMMIT');
+    return mapEventRow(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function deleteEvent(id: number): Promise<boolean> {
   if (!(await canUseDatabase())) {
     return mockDeleteEvent(id);
@@ -360,6 +392,7 @@ function mapTicketRow(row: {
   email: string;
   phone: string | null;
   is_paid: boolean;
+  checked_in?: boolean;
   created_at: string;
   title?: string;
   description?: string;
@@ -373,6 +406,7 @@ function mapTicketRow(row: {
   address?: string | null;
   image_url?: string;
   images?: string | any[];
+  is_completed?: boolean;
 }): Ticket {
   const ticket: Ticket = {
     id: row.id,
@@ -382,6 +416,7 @@ function mapTicketRow(row: {
     email: row.email,
     phone: row.phone,
     is_paid: row.is_paid,
+    checked_in: Boolean(row.checked_in),
     created_at: row.created_at,
   };
 
@@ -411,6 +446,7 @@ function mapTicketRow(row: {
           })()
         : [],
       created_at: row.created_at,
+      is_completed: Boolean(row.is_completed),
     };
   }
 
@@ -435,10 +471,11 @@ export async function createTicket(
     email: string;
     phone: string | null;
     is_paid: boolean;
+    checked_in: boolean;
     created_at: string;
   }>(
-    `INSERT INTO tickets (user_id, event_id, name, email, phone, is_paid)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO tickets (user_id, event_id, name, email, phone, is_paid, checked_in)
+     VALUES ($1, $2, $3, $4, $5, $6, false)
      RETURNING *`,
     [userId, eventId, ticketInfo.name, ticketInfo.email, ticketInfo.phone || null, isPaid]
   );
@@ -459,6 +496,7 @@ export async function getTicketsForUser(userId: number): Promise<Ticket[]> {
       email: string;
       phone: string | null;
       is_paid: boolean;
+      checked_in: boolean;
       created_at: string;
       title: string;
       description: string;
@@ -472,9 +510,10 @@ export async function getTicketsForUser(userId: number): Promise<Ticket[]> {
       address: string | null;
       image_url: string;
       images: string;
+      is_completed: boolean;
     }>(
       `SELECT t.*, e.title, e.description, e.category, e.date, e.price, e.is_free,
-        e.latitude, e.longitude, e.venue, e.address, e.image_url, e.images
+        e.latitude, e.longitude, e.venue, e.address, e.image_url, e.images, e.is_completed
        FROM tickets t
        JOIN events e ON e.id = t.event_id
        WHERE t.user_id = $1
@@ -494,6 +533,91 @@ export async function getTicketsForUser(userId: number): Promise<Ticket[]> {
   }
 }
 
+export async function getTicketById(ticketId: number): Promise<Ticket | null> {
+  if (!(await canUseDatabase())) {
+    return mockGetTicketById(ticketId);
+  }
+
+  try {
+    const result = await query<{
+      id: number;
+      user_id: number;
+      event_id: number;
+      name: string;
+      email: string;
+      phone: string | null;
+      is_paid: boolean;
+      checked_in: boolean;
+      created_at: string;
+      title: string;
+      description: string;
+      category: string;
+      date: string;
+      price: string;
+      is_free: boolean;
+      latitude: number;
+      longitude: number;
+      venue: string;
+      address: string | null;
+      image_url: string;
+      images: string;
+      is_completed: boolean;
+    }>(
+      `SELECT t.*, e.title, e.description, e.category, e.date, e.price, e.is_free,
+        e.latitude, e.longitude, e.venue, e.address, e.image_url, e.images, e.is_completed
+       FROM tickets t
+       JOIN events e ON e.id = t.event_id
+       WHERE t.id = $1`,
+      [ticketId]
+    );
+    if (result.rows.length === 0) return null;
+    return mapTicketRow(result.rows[0]);
+  } catch (error) {
+    if (shouldFallbackToMock(error)) {
+      handleDbFallback(
+        error,
+        isMissingTableError(error) ? 'Tables missing. Run: npm run db:init' : 'Connection lost.'
+      );
+      return mockGetTicketById(ticketId);
+    }
+    throw error;
+  }
+}
+
+export async function checkInTicket(ticketId: number): Promise<Ticket | null> {
+  if (!(await canUseDatabase())) {
+    return mockCheckInTicket(ticketId);
+  }
+
+  try {
+    const result = await query<{
+      id: number;
+      user_id: number;
+      event_id: number;
+      name: string;
+      email: string;
+      phone: string | null;
+      is_paid: boolean;
+      checked_in: boolean;
+      created_at: string;
+    }>(
+      `UPDATE tickets SET checked_in = true WHERE id = $1 RETURNING *`,
+      [ticketId]
+    );
+    if (result.rows.length === 0) return null;
+    return mapTicketRow(result.rows[0]);
+  } catch (error) {
+    if (shouldFallbackToMock(error)) {
+      handleDbFallback(
+        error,
+        isMissingTableError(error) ? 'Tables missing. Run: npm run db:init' : 'Connection lost.'
+      );
+      return mockCheckInTicket(ticketId);
+    }
+    throw error;
+  }
+}
+
 export async function getTicketsForEvent(eventId: number): Promise<Ticket[]> {
   if (!(await canUseDatabase())) {
     return mockGetEventTickets(eventId);
@@ -508,6 +632,7 @@ export async function getTicketsForEvent(eventId: number): Promise<Ticket[]> {
       email: string;
       phone: string | null;
       is_paid: boolean;
+      checked_in: boolean;
       created_at: string;
       title: string;
       description: string;
@@ -521,9 +646,10 @@ export async function getTicketsForEvent(eventId: number): Promise<Ticket[]> {
       address: string | null;
       image_url: string;
       images: string;
+      is_completed: boolean;
     }>(
       `SELECT t.*, e.title, e.description, e.category, e.date, e.price, e.is_free,
-        e.latitude, e.longitude, e.venue, e.address, e.image_url, e.images
+        e.latitude, e.longitude, e.venue, e.address, e.image_url, e.images, e.is_completed
        FROM tickets t
        JOIN events e ON e.id = t.event_id
        WHERE t.event_id = $1

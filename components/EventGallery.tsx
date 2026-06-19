@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import SafeImage from './SafeImage';
 
 interface EventGalleryProps {
   images: string[];
@@ -28,7 +29,7 @@ export default function EventGallery({ images, title, className = '' }: EventGal
 
   return (
     <div className={`relative overflow-hidden rounded-xl bg-gray-100 ${className}`}>
-      <img
+      <SafeImage
         src={list[index]}
         alt={`${title} — фото ${index + 1}`}
         className="h-72 w-full object-cover md:h-96"

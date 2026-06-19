@@ -14,6 +14,7 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
     sub: String(user.id),
     email: user.email,
     name: user.name,
+    phone: user.phone ?? null,
     role: user.role,
   })
     .setProtectedHeader({ alg: 'HS256' })
@@ -31,6 +32,7 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
       id,
       email: String(payload.email),
       name: String(payload.name),
+      phone: payload.phone ? String(payload.phone) : undefined,
       role: payload.role as UserRole,
     };
   } catch {
@@ -69,13 +71,45 @@ export function clearSessionCookieOptions() {
 }
 
 export async function requireSession(): Promise<SessionUser> {
-  const session = await getSession();
-  if (!session) throw new Error('UNAUTHORIZED');
-  return session;
+  try {
+    const session = await getSession();
+    if (!session) {
+      const error = new Error('UNAUTHORIZED');
+      console.error('[auth] requireSession failed: no session', {
+        name: error.name,
+        message: error.message,
+      });
+      throw error;
+    }
+    return session;
+  } catch (error) {
+    console.error('[auth] requireSession error:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
-  const session = await requireSession();
-  if (session.role !== 'admin') throw new Error('FORBIDDEN');
-  return session;
+  try {
+    const session = await requireSession();
+    if (session.role !== 'admin') {
+      const error = new Error('FORBIDDEN');
+      console.error('[auth] requireAdmin failed: insufficient role', {
+        userId: session.id,
+        role: session.role,
+        name: error.name,
+        message: error.message,
+      });
+      throw error;
+    }
+    return session;
+  } catch (error) {
+    console.error('[auth] requireAdmin error:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }

@@ -6,6 +6,7 @@ import { eventDistanceKm, formatDistance } from '@/lib/geo';
 import type { GeoPosition } from '@/hooks/useGeolocation';
 import { Heart, Calendar, MapPin, DollarSign, Navigation, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import SafeImage from './SafeImage';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
@@ -17,6 +18,7 @@ interface EventFeedProps {
   userPosition: GeoPosition | null;
   onToggleFavorite: (eventId: number) => void;
   onToggleGoing: (eventId: number, ticketInfo?: TicketInfo) => void;
+  layout?: 'grid' | 'carousel';
 }
 
 const categoryLabels: Record<Event['category'], string> = {
@@ -35,6 +37,7 @@ export default function EventFeed({
   userPosition,
   onToggleFavorite,
   onToggleGoing,
+  layout = 'grid',
 }: EventFeedProps) {
   const eventsWithDistance = useMemo(() => {
     if (!userPosition) return events;
@@ -51,15 +54,22 @@ export default function EventFeed({
       .sort((a, b) => (a.distance_km ?? 0) - (b.distance_km ?? 0));
   }, [events, userPosition]);
 
+  const containerClass =
+    layout === 'carousel'
+      ? 'flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pl-1 pr-3 scroll-smooth md:pb-6'
+      : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3';
+
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className={containerClass}>
       {eventsWithDistance.map((event) => (
         <article
           key={event.id}
-          className="flex flex-col overflow-hidden rounded-xl bg-white shadow-lg transition hover:shadow-xl border border-slate-200"
+          className={`flex flex-col overflow-hidden rounded-xl bg-white shadow-lg transition hover:shadow-xl border border-slate-200 ${
+            layout === 'carousel' ? 'min-w-[84%] snap-start sm:min-w-[48%] lg:min-w-[32%]' : ''
+          }`}
         >
           <Link href={`/events/${event.id}`} className="relative block h-48 overflow-hidden">
-            <img
+            <SafeImage
               src={event.images?.[0] || event.image_url}
               alt={`${event.title} — превью события`}
               className="h-full w-full object-cover"

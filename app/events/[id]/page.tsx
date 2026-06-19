@@ -91,6 +91,22 @@ export default function EventPage() {
     checkStatus();
   }, [eventId, checkStatus, position]);
 
+  useEffect(() => {
+    if (!ticket) return;
+
+    const interval = setInterval(async () => {
+      const ticketsRes = await fetch('/api/tickets', { cache: 'no-store' });
+      if (!ticketsRes.ok) return;
+      const tickets: Ticket[] = await ticketsRes.json();
+      const updated = tickets.find((item) => item.event_id === eventId) ?? null;
+      if (updated) {
+        setTicket(updated);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [eventId, ticket]);
+
   const toggleFavorite = async () => {
     const res = await fetch('/api/favorites', {
       method: 'POST',
@@ -152,7 +168,8 @@ export default function EventPage() {
   return (
     <EventDetailView
       event={event}
-      ticket={ticket}
+      ticket={ticket ?? undefined}
+      user={user}
       isFavorite={isFavorite}
       isGoing={isGoing}
       isLoggedIn={!!user}

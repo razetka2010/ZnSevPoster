@@ -5,6 +5,7 @@ import L from 'leaflet';
 import Link from 'next/link';
 import 'leaflet/dist/leaflet.css';
 import { Event } from '@/types';
+import SafeImage from './SafeImage';
 import { Heart } from 'lucide-react';
 import type { GeoPosition } from '@/hooks/useGeolocation';
 
@@ -75,7 +76,7 @@ export default function EventMap({
         <Marker key={event.id} position={[event.latitude, event.longitude]}>
           <Popup>
             <div className="max-w-xs">
-              <img
+              <SafeImage
                 src={event.image_url}
                 alt={event.title}
                 className="mb-2 h-28 w-full rounded object-cover"

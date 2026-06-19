@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import TicketQRCode from '@/components/TicketQRCode';
 import type { Ticket } from '@/types';
 
 function TicketRow({ ticket }: { ticket: Ticket }) {
@@ -57,6 +58,18 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
           Перейти к событию
         </Link>
       ) : null}
+
+      <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Статус входа</p>
+            <p className={`mt-1 font-semibold ${ticket.checked_in ? 'text-emerald-700' : 'text-slate-700'}`}>
+              {ticket.checked_in ? 'Вход подтверждён' : 'Ожидает подтверждения'}
+            </p>
+          </div>
+        </div>
+        <TicketQRCode ticketId={ticket.id} eventTitle={ticket.event?.title ?? 'события'} />
+      </div>
     </div>
   );
 }
@@ -66,23 +79,34 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadTickets = async () => {
+    try {
+      const res = await fetch('/api/tickets', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Не удалось загрузить билеты');
+      const data = await res.json();
+      setTickets(data ?? []);
+    } catch (err) {
+      setError('Ошибка при загрузке билетов. Попробуйте ещё раз.');
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
-      try {
-        const res = await fetch('/api/tickets', { cache: 'no-store' });
-        if (!res.ok) {
-          throw new Error('Не удалось загрузить билеты');
-        }
-        const data = await res.json();
-        setTickets(data ?? []);
-      } catch (error) {
-        setError('Ошибка при загрузке билетов. Попробуйте ещё раз.');
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      setError(null);
+      await loadTickets();
+      setLoading(false);
     };
 
     load();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTickets();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (

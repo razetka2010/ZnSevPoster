@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import EventFeed from '@/components/EventFeed';
@@ -129,6 +130,13 @@ function HomeContent() {
     return () => clearTimeout(timer);
   }, [filters, loadBootstrap]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadBootstrap(filters);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [filters, loadBootstrap]);
+
   const filteredEvents = useMemo(() => {
     if (!searchQuery.trim()) return events;
     const query = searchQuery.toLowerCase().trim();
@@ -189,37 +197,30 @@ function HomeContent() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-6 rounded-[2rem] border border-[var(--brand-soft)] bg-[var(--brand-soft)] p-5 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold text-[var(--brand-dark)] sm:text-4xl">
-              Афиша лучших событий
-            </h1>
-            <p className="mt-2 text-sm text-[var(--brand-muted)] sm:text-base">
-              Найдите мероприятия, фильмы, выставки и лекции рядом с вами.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="hidden items-center gap-2 rounded-3xl bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white sm:flex"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Фильтры
-          </button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Популярные</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Избранные события</h2>
         </div>
+        <Link
+          href="/favorites"
+          className="text-sm font-semibold text-[var(--brand)] hover:text-[var(--brand-dark)]"
+        >
+          Все
+        </Link>
+      </div>
 
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <label className="relative block text-sm text-slate-500">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск мероприятий"
-              className="w-full rounded-3xl border border-transparent bg-slate-50 px-11 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
-          </label>
-        </div>
+      <div className="mb-6 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="relative block text-sm text-slate-500">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск мероприятий"
+            className="w-full rounded-[1.75rem] border border-slate-200 bg-slate-50 px-11 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+          />
+        </label>
       </div>
 
       <LocationPrompt
@@ -275,6 +276,7 @@ function HomeContent() {
               userPosition={position}
               onToggleFavorite={toggleFavorite}
               onToggleGoing={toggleGoing}
+              layout="carousel"
             />
           )}
         </div>
@@ -293,6 +295,7 @@ function HomeContent() {
           userPosition={position}
           onToggleFavorite={toggleFavorite}
           onToggleGoing={toggleGoing}
+          layout="carousel"
         />
       )}
     </div>

@@ -16,6 +16,7 @@ export interface Event {
   image_url: string;
   images: string[];
   created_at: string;
+  is_completed: boolean;
   distance_km?: number;
 }
 
@@ -26,6 +27,7 @@ export interface EventFilters {
   lat?: number;
   lng?: number;
   radius_km?: number;
+  includeCompleted?: boolean;
 }
 
 export interface EventInput {
@@ -47,6 +49,7 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  phone?: string | null;
   role: UserRole;
   created_at: string;
 }
@@ -55,6 +58,7 @@ export interface SessionUser {
   id: number;
   email: string;
   name: string;
+  phone?: string | null;
   role: UserRole;
 }
 
@@ -72,6 +76,7 @@ export interface Ticket {
   email: string;
   phone?: string | null;
   is_paid: boolean;
+  checked_in: boolean;
   created_at: string;
   event?: Event;
 }
